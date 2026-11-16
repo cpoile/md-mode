@@ -3003,7 +3003,7 @@ SEPARATOR-ROW-NUM identifies the row separating headers from data."
       'md-render-table-header)
      ((and md-render-table-zebra-stripe
            (not (map-elt row :separator))
-           (= (mod data-row-num 2) 1))
+           (= (mod data-row-num 2) 0))
       'md-render-table-zebra))))
 
 (defun md-render--render-table-rule (col-widths left join right)
@@ -3556,10 +3556,15 @@ BOUNDARY-PIXELS is the uniform advance of every vertical border."
                                       'md-render-table-cell-start t cell))))
              (push cell parts)))
          wrapped content-widths alignments)
-        (push (concat styled-border
-                      (string-join (nreverse parts) styled-border)
-                      styled-border)
-              lines)))
+        (let ((line (concat styled-border
+                            (string-join (nreverse parts) styled-border)
+                            styled-border)))
+          ;; Continue the stripe through padding and column boundaries.
+          ;; Do not apply the header's bold face to border glyphs, whose
+          ;; advance was measured independently of header text.
+          (when (eq row-face 'md-render-table-zebra)
+            (add-face-text-property 0 (length line) row-face t line))
+          (push line lines))))
     (string-join (nreverse lines) "\n")))
 
 (defconst md-render--table-widget-width-cap-fraction 0.5

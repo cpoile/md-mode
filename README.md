@@ -264,13 +264,18 @@ This fork adds an optional reading column with full-width table widgets:
 (setq md-reading-width 760
       md-reading-font-family "Atkinson Hyperlegible Next"
       md-reading-font-weight 'normal
-      md-reading-text-point-increase 2
-      md-reading-table-point-increase 1)
+      md-reading-text-point-increase 4
+      md-reading-table-point-increase 2
+      md-reading-table-stripe-darkening 0.08)
 ```
 
-With a 14-point default font, prose uses 16 points and tables use 15 points.
+With a 14-point default font, prose uses 18 points and tables use 16 points.
 Regular text uses weight 400; explicit bold faces keep their emphasis. Fenced
 code blocks use the frame's original default font, point size and weight.
+Odd data rows (1, 3, 5, excluding the header) are striped across the complete
+row, including wrapped lines and column boundaries. The optional darkening
+setting derives the stripe background from the current default background
+on each render; nil keeps the theme's zebra face.
 The offsets are independent; both fonts are buffer-local and are restored on
 returning to source view. Configure these options before rendering, or use
 `md-mode-refresh-render` after changing them. The font must be installed on

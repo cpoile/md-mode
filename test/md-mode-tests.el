@@ -2421,6 +2421,22 @@ buffer?\" conflict (a hard error in batch)."
       (md-mode-show-source)
       (should (equal (buffer-string) source)))))
 
+(ert-deftest md-mode-table-widget-stripes-every-wrapped-line-and-border ()
+  (md-mode-tests--with-table-pixel-mocks
+   (let* ((rendered
+           (md-render--table-widget-row
+            :cells '("one two three" "four five six")
+            :widths '(70 70) :alignments '(left left)
+            :row-face 'md-render-table-zebra
+            :boundary-pixels 10 :window (selected-window)))
+          (lines (split-string rendered "\n")))
+     (should (> (length lines) 1))
+     (dolist (line lines)
+       (dotimes (index (length line))
+         (let ((faces (get-text-property index 'face line)))
+           (should (or (eq faces 'md-render-table-zebra)
+                       (memq 'md-render-table-zebra faces)))))))))
+
 (provide 'md-mode-tests)
 
 ;;; md-mode-tests.el ends here

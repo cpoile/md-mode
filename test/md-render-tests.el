@@ -857,6 +857,18 @@ after" nil)))))
 │ Alice │ Engineer │
 │ Bob   │ Manager  │")))
 
+(ert-deftest md-render-table-stripes-odd-data-rows-only ()
+  (let ((md-render-table-zebra-stripe t))
+    (should (eq (md-render--table-row-face '((:num . 0)) 1 0)
+                'md-render-table-header))
+    (should (eq (md-render--table-row-face '((:num . 2)) 1 0)
+                'md-render-table-zebra))
+    (should-not (md-render--table-row-face '((:num . 3)) 1 1))
+    (should (eq (md-render--table-row-face '((:num . 4)) 1 2)
+                'md-render-table-zebra)))
+  (let ((md-render-table-zebra-stripe nil))
+    (should-not (md-render--table-row-face '((:num . 2)) 1 0))))
+
 (ert-deftest md-render-table-measures-row-faces-before-padding ()
   (with-temp-buffer
     (insert "| 类型 | 值 |\n|---|---|\n| Secret | token |\n| Variable | branch |")
@@ -870,7 +882,7 @@ after" nil)))))
        (eq (get-text-property 0 'face (cadr (nth 0 processed)))
            'md-render-table-header))
       (should
-       (eq (get-text-property 0 'face (cadr (nth 3 processed)))
+       (eq (get-text-property 0 'face (cadr (nth 2 processed)))
            'md-render-table-zebra)))))
 
 (ert-deftest md-render-convert-table-output-wraps-one-cell ()
@@ -1386,9 +1398,9 @@ A " nil)
              ("
 " (fixed-pitch))
              ("│" (fixed-pitch md-render-table-border))
-             (" 1 " (fixed-pitch))
+             (" 1 " (fixed-pitch md-render-table-zebra))
              ("│" (fixed-pitch md-render-table-border))
-             (" 2 " (fixed-pitch))
+             (" 2 " (fixed-pitch md-render-table-zebra))
              ("│" (fixed-pitch md-render-table-border))))))
 
 (ert-deftest md-render-watermark-skips-prefix-on-streamed-append ()

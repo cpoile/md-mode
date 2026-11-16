@@ -11,6 +11,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'color)
 (require 'face-remap)
 (require 'subr-x)
 
@@ -54,6 +55,13 @@ This is independent of `md-reading-text-point-increase'."
   :type 'number
   :group 'md-reading)
 
+(defcustom md-reading-table-stripe-darkening nil
+  "Fraction by which to darken alternating table rows, or nil for theme faces.
+For example, 0.08 makes striped rows eight percent darker than the
+default background.  This is recalculated when entering rendered view."
+  :type '(choice (const :tag "Theme face" nil) float)
+  :group 'md-reading)
+
 (defvar-local md-reading--active nil
   "Non-nil while the buffer has reading typography enabled.")
 
@@ -65,6 +73,27 @@ This is independent of `md-reading-text-point-increase'."
 
 (defvar md-reading--updating nil
   "Non-nil while reading overlays are being rebuilt.")
+
+(defun md-reading--stripe-background ()
+  "Return a darker shade of the default background for alternating rows."
+  (when md-reading-table-stripe-darkening
+    (let* ((background (face-background 'default nil t))
+           ;; Parse RGB literals directly: terminal color lookup can round
+           ;; them to ANSI colors before the shade has been calculated.
+           (rgb (or (when (and (stringp background)
+                               (string-match-p
+                                "\\`#[[:xdigit:]]\\{6\\}\\'" background))
+                      (cl-loop for offset in '(1 3 5)
+                               collect (/ (string-to-number
+                                           (substring background offset
+                                                      (+ offset 2)) 16)
+                                          255.0)))
+                    (color-name-to-rgb background)))
+           (scale (- 1 (max 0 (min 1 md-reading-table-stripe-darkening)))))
+      (when rgb
+        (apply #'color-rgb-to-hex
+               (append (mapcar (lambda (channel) (* channel scale)) rgb)
+                       '(2)))))))
 
 (defun md-reading-prepare ()
   "Prepare buffer-local reading fonts before measuring rendered widgets."
@@ -107,6 +136,10 @@ This is independent of `md-reading-text-point-increase'."
                  :height (face-attribute 'default :height nil t)
                  :weight (face-attribute 'default :weight nil t))
                 md-reading--font-remaps))))
+    (when-let* ((background (md-reading--stripe-background)))
+      (push (face-remap-add-relative 'md-render-table-zebra
+                                     :background background)
+            md-reading--font-remaps))
     (add-hook 'window-size-change-functions #'md-reading--window-change nil t)
     (add-hook 'text-scale-mode-hook #'md-reading-refresh nil t)
     (add-hook 'kill-buffer-hook #'md-reading-clear nil t)))
