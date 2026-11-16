@@ -3672,15 +3672,12 @@ cannot starve the other columns."
   "Return the pixel budget for a table laid out at WIDTH columns in WINDOW.
 
 WIDTH comes from `window-body-width', which counts columns of the
-frame's default font.  Converting it back with the `fixed-pitch'
-space width overshoots whenever `default' and `fixed-pitch' use
-fonts of different advance (an Iosevka frame whose `fixed-pitch'
-falls back to Courier is 14% too wide), and likewise under
-`text-scale-mode'.  So when WIDTH fills WINDOW, never exceed the
-window's real body pixel width.  The clamp is skipped when the
-window reports pixels no larger than its column count (batch
-frames and mocked windows), where the measurement is the only
-meaningful unit."
+frame's default font.  The table font's space can be either narrower
+or wider, so converting those columns with that font can underfill
+or overrun the window.  When WIDTH fills WINDOW, use the actual
+window body pixels.  Smaller requests retain the table font's measured
+unit.  Batch frames reporting no more pixels than columns also keep
+the measured unit."
   (let ((measured (md-render--table-measure-string
                    (make-string width ?\s) window))
         (body-pixels (and (window-live-p window)
@@ -3688,7 +3685,7 @@ meaningful unit."
     (if (and body-pixels
              (> body-pixels width)
              (>= width (window-body-width window)))
-        (min measured body-pixels)
+        body-pixels
       measured)))
 
 (cl-defun md-render--render-table-widget-source (&key source window width)

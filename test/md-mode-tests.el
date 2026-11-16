@@ -1580,6 +1580,18 @@ the window's 700 real pixels instead of 1000."
                        (md-render--table-widget-layout widget 100) "\n"))
           (should (<= (md-mode-tests--table-test-string-pixels line) 700)))))))
 
+(ert-deftest md-mode-table-widget-budget-fills-window-with-narrower-spaces ()
+  "A proportional table font must not halve the full-window pixel budget."
+  (cl-letf (((symbol-function 'window-body-width)
+             (lambda (&optional _window pixelwise)
+               (if pixelwise 1000 100)))
+            ((symbol-function 'md-render--table-measure-string)
+             (lambda (string _) (* 4 (length string)))))
+    (should (= (md-render--table-widget-pixel-budget 100 (selected-window))
+               1000))
+    (should (= (md-render--table-widget-pixel-budget 40 (selected-window))
+               160))))
+
 (defmacro md-mode-tests--with-table-pixel-mocks (&rest body)
   "Run BODY with deterministic table pixel measurement.
 Mock font width as well as GUI detection so batch tests need no real fonts."

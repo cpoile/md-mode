@@ -39,6 +39,15 @@ Rendered tables always keep the full window width."
   :type 'number
   :group 'md-reading)
 
+(defcustom md-reading-font-weight nil
+  "Base weight of rendered reading text, or nil to retain the default.
+The value `normal' corresponds to regular weight (CSS weight 400).
+Faces for bold emphasis and headings retain their own weight."
+  :type '(choice (const :tag "Default weight" nil)
+                 (const :tag "Regular (400)" normal)
+                 (const light) (const medium) (const semibold))
+  :group 'md-reading)
+
 (defcustom md-reading-table-point-increase 0
   "Number of points to add to the default font for rendered tables.
 This is independent of `md-reading-text-point-increase'."
@@ -61,16 +70,22 @@ This is independent of `md-reading-text-point-increase'."
   "Prepare buffer-local reading fonts before measuring rendered widgets."
   (unless md-reading--active
     (setq md-reading--active t)
-    (when (or md-reading-font-family
+    (when (or md-reading-font-family md-reading-font-weight
               (/= md-reading-text-point-increase 0)
               (/= md-reading-table-point-increase 0))
-      (let* ((increase (* 10 md-reading-text-point-increase))
-             (table-height (+ (face-attribute 'default :height nil t)
+      (let* ((base-height (face-attribute 'default :height nil t))
+             (increase (* 10 md-reading-text-point-increase))
+             (table-height (+ base-height
                               (* 10 md-reading-table-point-increase)))
              (family (when md-reading-font-family
-                       (list :family md-reading-font-family))))
+                       (list :family md-reading-font-family)))
+             (weight (when md-reading-font-weight
+                       (list :weight md-reading-font-weight))))
         (push (apply #'face-remap-add-relative 'default
-                     :height (lambda (height) (+ height increase)) family)
+                     :height (lambda (height)
+                               (+ (if (numberp height) height base-height)
+                                  increase))
+                     (append family weight))
               md-reading--font-remaps)
         ;; Table measuring and drawing both use fixed-pitch, even when the
         ;; selected family is proportional.  Explicit height avoids inheriting
@@ -78,13 +93,19 @@ This is independent of `md-reading-text-point-increase'."
         (push (apply #'face-remap-add-relative 'fixed-pitch
                      :height (round table-height) family)
               md-reading--font-remaps)
-        ;; Code faces can inherit fixed-pitch too; only tables should retain
-        ;; the table height.  A table's leading fixed-pitch face still wins
-        ;; over inline-code when a cell contains a code span.
-        (dolist (face '(md-render-inline-code md-render-source-block))
-          (push (apply #'face-remap-add-relative face
-                       :height (round (+ (face-attribute 'default :height nil t)
-                                         increase)) family)
+        ;; Inline code follows the prose size, except inside a table where
+        ;; the leading fixed-pitch face preserves the table's smaller size.
+        (push (apply #'face-remap-add-relative 'md-render-inline-code
+                     :height (round (+ (face-attribute 'default :height nil t)
+                                       increase)) family)
+              md-reading--font-remaps)
+        ;; Block code uses the frame's original font, size and weight, rather
+        ;; than inheriting the reading or table remapping through fixed-pitch.
+        (dolist (face '(md-render-source-block md-render-source-block-language))
+          (push (face-remap-add-relative
+                 face :family (face-attribute 'default :family nil t)
+                 :height (face-attribute 'default :height nil t)
+                 :weight (face-attribute 'default :weight nil t))
                 md-reading--font-remaps))))
     (add-hook 'window-size-change-functions #'md-reading--window-change nil t)
     (add-hook 'text-scale-mode-hook #'md-reading-refresh nil t)
