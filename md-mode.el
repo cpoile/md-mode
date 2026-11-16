@@ -33,6 +33,7 @@
 ;;; Code:
 
 (require 'md-render)
+(require 'md-reading)
 (require 'browse-url)
 (require 'cl-lib)
 (require 'face-remap)
@@ -2543,7 +2544,8 @@ When FORCE is non-nil, relayout even when the character width is unchanged."
                                        md-render-source)))
                   (textui-attach-widget widget from to)))
               (setq md-mode--table-widget-width width)))
-          (set-buffer-modified-p modified))))))
+          (set-buffer-modified-p modified)
+          (md-reading-apply))))))
 
 (defun md-mode--refresh-table-widget-layout-after-scale ()
   "Relayout rendered table widgets after a text-scale change."
@@ -2559,37 +2561,44 @@ When FORCE is non-nil, relayout even when the character width is unchanged."
                (not (require 'textui nil t)))
       (user-error "Rendered table widgets require TextUI"))
     (outline-show-all)
-    (let ((modified (buffer-modified-p))
-          (buffer-undo-list t)
-          (inhibit-read-only t)
-          ;; Rendering is a view change, not an edit: a nil
-          ;; `buffer-file-name' skips the supersession prompt ("changed
-          ;; on disk; really edit the buffer?") that would otherwise
-          ;; abort the first render after an external tool rewrites the
-          ;; visited file (e.g. a doc regenerated while previewing).
-          (buffer-file-name nil)
-          (buffer-file-truename nil))
-      (save-restriction
-        (widen)
-        (when font-lock-mode
-          (font-lock-ensure))
-        ;; Track point through markup removal instead of leaving it at
-        ;; the renderer's last insertion.  Replaced blocks keep point
-        ;; at their start, near the original reading position.
-        (save-excursion
-          (with-silent-modifications
-            (md-render-replace-markup :force t :defer-tables t)
-            (md-mode--attach-table-widgets))))
-      (md-mode--set-rendered-p t)
-      (md-mode--scale-heading-fallback-font)
-      (set-buffer-modified-p modified)
-      (md-mode--refresh-toc))))
+    (md-reading-prepare)
+    (md-render-reset-table-measurements)
+    (unwind-protect
+        (let ((modified (buffer-modified-p))
+              (buffer-undo-list t)
+              (inhibit-read-only t)
+              ;; Rendering is a view change, not an edit: a nil
+              ;; `buffer-file-name' skips the supersession prompt ("changed
+              ;; on disk; really edit the buffer?") that would otherwise
+              ;; abort the first render after an external tool rewrites the
+              ;; visited file (e.g. a doc regenerated while previewing).
+              (buffer-file-name nil)
+              (buffer-file-truename nil))
+          (save-restriction
+            (widen)
+            (when font-lock-mode
+              (font-lock-ensure))
+            ;; Track point through markup removal instead of leaving it at
+            ;; the renderer's last insertion.  Replaced blocks keep point
+            ;; at their start, near the original reading position.
+            (save-excursion
+              (with-silent-modifications
+                (md-render-replace-markup :force t :defer-tables t)
+                (md-mode--attach-table-widgets))))
+          (md-mode--set-rendered-p t)
+          (md-mode--scale-heading-fallback-font)
+          (set-buffer-modified-p modified)
+          (md-mode--refresh-toc)
+          (md-reading-apply))
+      (unless md-mode--rendered-p
+        (md-reading-clear)))))
 
 ;;;###autoload
 (defun md-mode-show-source ()
   "Restore editable Markdown source in the current buffer."
   (interactive)
   (when md-mode--rendered-p
+    (md-reading-clear)
     (let ((modified (buffer-modified-p))
           (source-point nil)
           (buffer-undo-list t)

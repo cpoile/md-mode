@@ -256,6 +256,30 @@ Editing and structure:
 | `md-mode-heading-scaling-values` | `(2.0 1.7 1.4 1.1 1.0 1.0)` | Set relative sizes for heading levels one through six |
 | `md-mode-table-relayout-delay` | `0.15` | Idle seconds to wait after a window resize before relaying out rendered tables; `0` relayouts immediately |
 
+### Centered reading layout (local fork)
+
+This fork adds an optional reading column with full-width table widgets:
+
+```elisp
+(setq md-reading-width 760
+      md-reading-font-family "Atkinson Hyperlegible Next"
+      md-reading-text-point-increase 2
+      md-reading-table-point-increase 1)
+```
+
+With a 14-point default font, prose uses 16 points and tables use 15 points.
+The offsets are independent; both fonts are buffer-local and are restored on
+returning to source view. Configure these options before rendering, or use
+`md-mode-refresh-render` after changing them. The font must be installed on
+each machine. Emacs 31 measures the proportional font exactly; older versions
+use a character-width approximation for the reading column.
+
+`md-reading-width` defaults to nil, preserving the original layout.
+`md-reading-padding` defaults to 16 pixels on each side of narrow windows.
+Window-specific display overlays wrap and inset non-table content without
+editing any text or source annotations. Different windows can show the same
+buffer at different widths. Table widgets keep the full window's layout budget.
+
 Rendered images and tables:
 
 | Option | Default | Purpose |

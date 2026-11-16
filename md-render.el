@@ -2744,6 +2744,12 @@ Cache lives in the destination buffer so per-buffer font settings
 such as text scaling and face remapping get their own ratios.  Lazily
 initialized.")
 
+(defun md-render-reset-table-measurements ()
+  "Discard buffer-local table measurements after changing rendered fonts."
+  (setq md-render--table-char-pixel-cache nil
+        md-render--table-widget-measure-cache nil
+        md-render--table-face-width-cache nil))
+
 (defun md-render--table-face-width-ratio (face window)
   "Return pixel-width ratio of FACE-styled text vs unfaced text in WINDOW.
 A ratio of 1.0 means FACE doesn't affect rendered char width.
