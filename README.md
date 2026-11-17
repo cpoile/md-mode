@@ -268,7 +268,7 @@ This fork adds an optional reading column with full-width table widgets:
       md-reading-table-point-increase 2
       md-reading-table-stripe-darkening 0.08
       md-reading-line-spacing 0.15
-      md-reading-bold-color "#C19CA7"
+      md-reading-bold-color "#D596A7"
       md-reading-plain-links t)
 ```
 
@@ -280,7 +280,7 @@ row, including wrapped lines and column boundaries. The optional darkening
 setting derives the stripe background from the current default background
 on each render; nil keeps the theme's zebra face.
 The example adds 15% of the frame's line height as extra spacing and uses
-`#C19CA7` for bold text. Plain links keep their color and underline while
+`#D596A7` for bold text. Plain links keep their color and underline while
 discarding inherited bold weight and backgrounds, including inside striped
 table rows. These styles and the previous line-spacing value are restored
 when returning to source view.
