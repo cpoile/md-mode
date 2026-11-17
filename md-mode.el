@@ -261,6 +261,8 @@ not load or require `markdown-mode'."
   "p" #'md-mode-previous-heading
   "TAB" #'md-render-view-next-heading
   "<tab>" #'md-render-view-next-heading
+  "S-TAB" #'md-mode-backtab
+  "<backtab>" #'md-mode-backtab
   "g" #'md-mode-refresh-render)
 
 (define-minor-mode md-render-view-mode
@@ -479,42 +481,68 @@ independent editing mode."
 
 BOUND, MOVE, BACKWARD, and LOOKING-AT follow the contract of
 `outline-search-function'.  Headings inside fenced blocks are
-ignored."
-  (let ((origin (point))
-        (limit (or bound (if backward (point-min) (point-max))))
-        found)
-    (if looking-at
-        (setq found
-              (and (looking-at md-mode--heading-regexp)
-                   (not (md-mode--inside-fenced-block-p))))
-      (while (and (not found)
-                  (if backward
-                      (re-search-backward
-                       md-mode--heading-regexp limit t)
-                    (re-search-forward
-                     md-mode--heading-regexp limit t)))
-        (unless (md-mode--inside-fenced-block-p (match-beginning 0))
-          (setq found t)))
-      (unless found
-        (goto-char (if move limit origin))))
-    found))
+ignored.  Rendered views search the annotated heading levels instead
+of Markdown delimiters that have already been removed."
+  (if md-mode--rendered-p
+      (outline-search-level bound move backward looking-at)
+    (let ((origin (point))
+          (limit (or bound (if backward (point-min) (point-max))))
+          found)
+      (if looking-at
+          (setq found
+                (and (looking-at md-mode--heading-regexp)
+                     (not (md-mode--inside-fenced-block-p))))
+        (while (and (not found)
+                    (if backward
+                        (re-search-backward
+                         md-mode--heading-regexp limit t)
+                      (re-search-forward
+                       md-mode--heading-regexp limit t)))
+          (unless (md-mode--inside-fenced-block-p (match-beginning 0))
+            (setq found t)))
+        (unless found
+          (goto-char (if move limit origin))))
+      found)))
 
 (defun md-mode--outline-level ()
   "Return the Markdown heading level at point."
-  (length (match-string 1)))
+  (if md-mode--rendered-p
+      (get-text-property (line-beginning-position) 'outline-level)
+    (length (match-string 1))))
 
-(defun md-mode--rendered-heading-positions ()
-  "Return buffer positions of headings in a rendered view."
-  (let (positions)
+(defun md-mode--annotate-rendered-headings ()
+  "Annotate rendered heading lines with their native Outline level."
+  (with-silent-modifications
     (save-excursion
       (goto-char (point-min))
       (while-let ((match (text-property-search-forward
-                          'md-render-source)))
-        (let ((source (prop-match-value match)))
-          (when (and (stringp source)
-                     (string-match md-mode--heading-regexp source)
-                     (= (match-beginning 0) 0))
-            (push (prop-match-beginning match) positions)))))
+                          'md-render-line-context)))
+        (let ((context (prop-match-value match)))
+          (when (eq (plist-get context :kind) 'heading)
+            (let* ((begin (prop-match-beginning match))
+                   (end (save-excursion
+                          (goto-char begin)
+                          (line-end-position))))
+              (put-text-property begin end 'outline-level
+                                 (plist-get context :level)))))))))
+
+(defun md-mode--rendered-heading-positions ()
+  "Return buffer positions of headings in a rendered view.
+Prefer native Outline annotations; older rendered buffers without
+them can still identify headings from stored Markdown source."
+  (let (positions)
+    (save-excursion
+      (goto-char (point-min))
+      (while-let ((match (text-property-search-forward 'outline-level)))
+        (push (prop-match-beginning match) positions))
+      (unless positions
+        (goto-char (point-min))
+        (while-let ((match (text-property-search-forward 'md-render-source)))
+          (let ((source (prop-match-value match)))
+            (when (and (stringp source)
+                       (string-match md-mode--heading-regexp source)
+                       (= (match-beginning 0) 0))
+              (push (prop-match-beginning match) positions))))))
     (nreverse positions)))
 
 (defun md-mode--move-rendered-heading (direction count)
@@ -524,11 +552,13 @@ ignored."
          (candidates
           (if (> direction 0)
               (seq-filter (lambda (position)
-                            (> position (point)))
+                            (and (> position (point))
+                                 (not (outline-invisible-p position))))
                           positions)
             (nreverse
              (seq-filter (lambda (position)
-                           (< position line-start))
+                           (and (< position line-start)
+                                (not (outline-invisible-p position))))
                          positions))))
          (target (nth (1- count) candidates)))
     (if target
@@ -2381,7 +2411,7 @@ Preserve rendered properties when Font Lock is disabled or restarted."
   "Outdent a list item or cycle all Markdown headings."
   (interactive)
   (md-mode--ensure-mode)
-  (if (md-mode--list-item-info)
+  (if (and (not md-mode--rendered-p) (md-mode--list-item-info))
       (md-mode-outdent-list-item)
     (outline-cycle-buffer)))
 
@@ -2584,7 +2614,8 @@ When FORCE is non-nil, relayout even when the character width is unchanged."
             (save-excursion
               (with-silent-modifications
                 (md-render-replace-markup :force t :defer-tables t)
-                (md-mode--attach-table-widgets))))
+                (md-mode--attach-table-widgets)
+                (md-mode--annotate-rendered-headings))))
           (md-mode--set-rendered-p t)
           (md-mode--scale-heading-fallback-font)
           (set-buffer-modified-p modified)

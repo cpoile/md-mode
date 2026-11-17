@@ -164,8 +164,15 @@ the source view is restored.
 | DEL / S-SPC | Scroll up one page                           |
 | n / p      | Move to the next / previous heading          |
 | TAB        | Move to the next heading, wrapping to first  |
+| S-TAB / Backtab | Cycle top-level headings / all headings / all content |
 | g          | Re-render from the current Markdown source  |
 | C-c C-v    | Return to the editable source view           |
+
+Rendered folding uses heading-level metadata, so ATX and Setext headings
+remain foldable after their Markdown delimiters are removed. Lists in this
+read-only view cycle document folding instead of being outdented. Heading
+navigation skips subheadings hidden by a fold. Folding does not change the
+Markdown source, table contents, or the buffer's modified state.
 
 ### Lists and tasks
 
