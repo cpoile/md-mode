@@ -163,7 +163,7 @@ the source view is restored.
 | SPC        | Scroll down one page                         |
 | DEL / S-SPC | Scroll up one page                           |
 | n / p      | Move to the next / previous heading          |
-| TAB        | Move to the next heading, wrapping to first  |
+| TAB        | On a heading, cycle its subtree; elsewhere, move to the next heading |
 | S-TAB / Backtab | Cycle top-level headings / all headings / all content |
 | g          | Re-render from the current Markdown source  |
 | C-c C-v    | Return to the editable source view           |
@@ -173,6 +173,9 @@ remain foldable after their Markdown delimiters are removed. Lists in this
 read-only view cycle document folding instead of being outdented. Heading
 navigation skips subheadings hidden by a fold. Folding does not change the
 Markdown source, table contents, or the buffer's modified state.
+Tab on a heading cycles just that subtree through hidden, headings only,
+and fully visible states, like Org mode. Away from headings, Tab keeps its
+navigation behavior, wrapping to the first heading at the end.
 
 ### Lists and tasks
 

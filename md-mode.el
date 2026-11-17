@@ -259,8 +259,8 @@ not load or require `markdown-mode'."
   "S-SPC" #'scroll-down-command
   "n" #'md-mode-next-heading
   "p" #'md-mode-previous-heading
-  "TAB" #'md-render-view-next-heading
-  "<tab>" #'md-render-view-next-heading
+  "TAB" #'md-render-view-tab
+  "<tab>" #'md-render-view-tab
   "S-TAB" #'md-mode-backtab
   "<backtab>" #'md-mode-backtab
   "g" #'md-mode-refresh-render)
@@ -603,6 +603,20 @@ them can still identify headings from stored Markdown source."
   (interactive "p")
   (md-mode--ensure-mode)
   (md-mode--move-heading -1 (or count 1)))
+
+;;;###autoload
+(defun md-render-view-tab ()
+  "Cycle the heading at point, or move to the next rendered heading.
+On a heading, cycle its subtree through hidden, headings only, and
+fully visible states.  Elsewhere, move to the next heading, wrapping
+to the first heading at the end of the document."
+  (interactive)
+  (md-mode--ensure-mode)
+  (unless md-mode--rendered-p
+    (user-error "Not in rendered view"))
+  (if (outline-on-heading-p t)
+      (outline-cycle)
+    (md-render-view-next-heading)))
 
 ;;;###autoload
 (defun md-render-view-next-heading ()
