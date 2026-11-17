@@ -111,6 +111,41 @@
           (should (= (caadr (car md-reading--layouts)) 25)))
         (md-reading-clear)))))
 
+(ert-deftest md-reading-styles-restore-source-spacing-and-link-mappings ()
+  (dolist (local '(nil t))
+    (with-temp-buffer
+      (let ((md-reading-line-spacing 0.15)
+            (md-reading-bold-color "#C19CA7")
+            (md-reading-plain-links t)
+            (old-link '(md-render-link markdown-link-face md-render-link)))
+        (setq-local face-remapping-alist (list old-link))
+        (when local (setq-local line-spacing 3))
+        (let ((spacing line-spacing))
+          (md-reading-prepare)
+          (should (= line-spacing 0.15))
+          (let ((style (cadr (assq 'md-render-link face-remapping-alist))))
+            (should (eq (plist-get style :weight) 'normal))
+            (should (plist-get style :underline))
+            (should-not (plist-member style :background))
+            (should-not (plist-member style :inherit)))
+          (should (equal (plist-get (cadr (assq 'md-render-bold
+                                               face-remapping-alist))
+                                    :foreground)
+                         "#C19CA7"))
+          (md-reading-clear)
+          (should (eq (assq 'md-render-link face-remapping-alist) old-link))
+          (should (equal line-spacing spacing))
+          (should (eq (local-variable-p 'line-spacing) local)))))))
+
+(ert-deftest md-reading-plain-links-do-not-change-other-buffers ()
+  (let ((global (default-value 'face-remapping-alist)))
+    (with-temp-buffer
+      (let ((md-reading-plain-links t))
+        (md-reading-prepare)
+        (should (equal (default-value 'face-remapping-alist) global))
+        (md-reading-clear)
+        (should-not (assq 'md-render-link face-remapping-alist))))))
+
 (ert-deftest md-reading-scopes-layout-to-each-window ()
   (save-window-excursion
     (with-temp-buffer
@@ -220,7 +255,7 @@
   (save-window-excursion
     (with-temp-buffer
       (set-window-buffer (selected-window) (current-buffer))
-      (insert "Plain prose\n\n| First | Second | Third |\n| --- | --- | --- |\n| "
+      (insert "Plain prose with **bold** and [a link](https://example.com).\n\n| First | Second | Third |\n| --- | --- | --- |\n| "
               (apply #'concat (make-list 25 "long table content ")) " | "
               (apply #'concat (make-list 25 "more table content ")) " | "
               (apply #'concat (make-list 25 "other table content "))
@@ -230,9 +265,12 @@
             (md-reading-width 760)
             (md-reading-font-family "Atkinson Hyperlegible Next")
             (md-reading-font-weight 'normal)
-            (md-reading-text-point-increase 4)
+            (md-reading-text-point-increase 5)
             (md-reading-table-point-increase 2)
             (md-reading-table-stripe-darkening 0.08)
+            (md-reading-line-spacing 0.15)
+            (md-reading-bold-color "#C19CA7")
+            (md-reading-plain-links t)
             (md-render-wrap-lines t)
             (md-render-table-wrap-columns t))
         (md-mode)
@@ -250,8 +288,13 @@
                (pixels (string-pixel-width rule (current-buffer))))
           (should (equal (font-get prose :weight) normal))
           (should (= (font-get prose :size)
-                     (+ (/ (face-attribute 'default :height nil t) 10) 4)))
+                     (+ (/ (face-attribute 'default :height nil t) 10) 5)))
           (should (<= (abs (- pixels (window-body-width window t))) 2))
+          (should (= line-spacing 0.15))
+          (search-forward "a link")
+          (should (equal (font-get (font-at (1- (point)) window) :weight) normal))
+          (should (equal (get-text-property (1- (point)) 'md-render-url)
+                         "https://example.com"))
           (search-forward "long table content")
           (should (equal (font-get (font-at (1- (point)) window) :weight) normal))
           (should (= (font-get (font-at (1- (point)) window) :size)

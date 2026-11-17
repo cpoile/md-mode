@@ -49,6 +49,23 @@ Faces for bold emphasis and headings retain their own weight."
                  (const light) (const medium) (const semibold))
   :group 'md-reading)
 
+(defcustom md-reading-line-spacing nil
+  "Additional rendered line spacing, or nil to retain existing spacing.
+Integers specify pixels; floats specify a fraction of the frame line height."
+  :type '(choice (const :tag "Existing spacing" nil) number)
+  :group 'md-reading)
+
+(defcustom md-reading-bold-color nil
+  "Foreground color for rendered bold text, or nil for the theme color."
+  :type '(choice (const :tag "Theme color" nil) color)
+  :group 'md-reading)
+
+(defcustom md-reading-plain-links nil
+  "Whether rendered links use normal weight without an inherited background.
+Link color and underlining remain distinct from surrounding prose."
+  :type 'boolean
+  :group 'md-reading)
+
 (defcustom md-reading-table-point-increase 0
   "Number of points to add to the default font for rendered tables.
 This is independent of `md-reading-text-point-increase'."
@@ -70,6 +87,12 @@ default background.  This is recalculated when entering rendered view."
 
 (defvar-local md-reading--layouts nil
   "Window layout records, each (WINDOW SIGNATURE . OVERLAYS).")
+
+(defvar-local md-reading--line-spacing-state nil
+  "Saved `line-spacing' locality and value, or nil when unchanged.")
+
+(defvar-local md-reading--link-remapping nil
+  "Cons of the reading link entry and its original remapping entry.")
 
 (defvar md-reading--updating nil
   "Non-nil while reading overlays are being rebuilt.")
@@ -99,6 +122,10 @@ default background.  This is recalculated when entering rendered view."
   "Prepare buffer-local reading fonts before measuring rendered widgets."
   (unless md-reading--active
     (setq md-reading--active t)
+    (when md-reading-line-spacing
+      (setq md-reading--line-spacing-state
+            (cons (local-variable-p 'line-spacing) line-spacing))
+      (setq-local line-spacing md-reading-line-spacing))
     (when (or md-reading-font-family md-reading-font-weight
               (/= md-reading-text-point-increase 0)
               (/= md-reading-table-point-increase 0))
@@ -140,6 +167,28 @@ default background.  This is recalculated when entering rendered view."
       (push (face-remap-add-relative 'md-render-table-zebra
                                      :background background)
             md-reading--font-remaps))
+    (when md-reading-bold-color
+      (push (face-remap-add-relative 'md-render-bold
+                                     :foreground md-reading-bold-color
+                                     :weight 'bold)
+            md-reading--font-remaps))
+    (when md-reading-plain-links
+      (let* ((old (assq 'md-render-link face-remapping-alist))
+             (foreground (or (and (facep 'markdown-link-face)
+                                  (face-foreground 'markdown-link-face nil t))
+                             (face-foreground 'link nil t)
+                             (face-foreground 'default nil t)))
+             ;; A relative remap would still inherit the base link face's
+             ;; background.  Replace the complete entry while reading, so
+             ;; table stripes can show through links too.
+             (entry `(md-render-link
+                      (:foreground ,foreground :weight normal :underline t))))
+        (setq md-reading--link-remapping (cons entry old))
+        (setq-local face-remapping-alist
+              (if old
+                  (mapcar (lambda (item) (if (eq item old) entry item))
+                          face-remapping-alist)
+                (cons entry face-remapping-alist)))))
     (add-hook 'window-size-change-functions #'md-reading--window-change nil t)
     (add-hook 'text-scale-mode-hook #'md-reading-refresh nil t)
     (add-hook 'kill-buffer-hook #'md-reading-clear nil t)))
@@ -149,8 +198,22 @@ default background.  This is recalculated when entering rendered view."
   (dolist (record md-reading--layouts)
     (mapc #'delete-overlay (cddr record)))
   (mapc #'face-remap-remove-relative md-reading--font-remaps)
+  (when md-reading--line-spacing-state
+    (if (car md-reading--line-spacing-state)
+        (setq-local line-spacing (cdr md-reading--line-spacing-state))
+      (kill-local-variable 'line-spacing)))
+  (when md-reading--link-remapping
+    (let ((entry (car md-reading--link-remapping))
+          (old (cdr md-reading--link-remapping)))
+      (setq-local face-remapping-alist
+            (if old
+                (mapcar (lambda (item) (if (eq item entry) old item))
+                        face-remapping-alist)
+              (delq entry face-remapping-alist)))))
   (setq md-reading--layouts nil
         md-reading--font-remaps nil
+        md-reading--line-spacing-state nil
+        md-reading--link-remapping nil
         md-reading--active nil)
   (remove-hook 'window-size-change-functions #'md-reading--window-change t)
   (remove-hook 'text-scale-mode-hook #'md-reading-refresh t)
